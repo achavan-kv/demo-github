@@ -1,14 +1,26 @@
-import json
 import os
+import time
 import requests
 
+# ==========================================
+# API KEY
+# ==========================================
+
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+
+# ==========================================
+# LOAD DIFF
+# ==========================================
 
 with open("pr.diff", "r", encoding="utf-8") as f:
     diff = f.read()
 
 # Prevent token overflow
 diff = diff[:120000]
+
+# ==========================================
+# PROMPT
+# ==========================================
 
 prompt = f"""
 You are a highly strict Principal .NET Architect, SQL Server Performance Expert,
@@ -223,9 +235,14 @@ PR DIFF
 {diff}
 """
 
+# ==========================================
+# REQUEST BODY
+# ==========================================
+
 body = {
-    "model": "claude-3-5-sonnet-20241022",
+    "model": "claude-3-7-sonnet-20250219",
     "max_tokens": 4000,
+    "temperature": 0.1,
     "messages": [
         {
             "role": "user",
@@ -234,47 +251,76 @@ body = {
     ]
 }
 
-response = requests.post(
-    "https://api.anthropic.com/v1/messages",
-    headers={
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json"
-    },
-    json=body,
-    timeout=120
-)
+# ==========================================
+# CALL CLAUDE API
+# ==========================================
 
-print("========== CLAUDE API RESPONSE ==========")
-print("Status Code:", response.status_code)
-print(response.text)
+max_retries = 3
 
-if response.status_code != 200:
-    with open("comment.txt", "w", encoding="utf-8") as f:
-        f.write(
-            f"Claude API Error: {response.status_code}\n\n{response.text}"
+for attempt in range(max_retries):
+
+    try:
+
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            },
+            json=body,
+            timeout=180
         )
-    exit(1)
 
-data = response.json()
+        print("========== CLAUDE API RESPONSE ==========")
+        print("Status Code:", response.status_code)
+        print(response.text)
 
-comment = "No review generated."
+        if response.status_code == 429:
+            print("Rate limit exceeded. Waiting 60 seconds...")
+            time.sleep(60)
+            continue
 
-try:
-    if "content" in data:
-        parts = []
+        if response.status_code != 200:
 
-        for item in data["content"]:
-            if item.get("type") == "text":
-                parts.append(item.get("text", ""))
+            with open("comment.txt", "w", encoding="utf-8") as f:
+                f.write(
+                    f"Claude API Error: {response.status_code}\n\n{response.text}"
+                )
 
-        comment = "\n".join(parts)
+            exit(1)
 
-except Exception as ex:
-    comment = f"Error parsing Claude response: {str(ex)}"
+        data = response.json()
 
-with open("comment.txt", "w", encoding="utf-8") as f:
-    f.write(comment)
+        comment = "No review generated."
 
-print("========== FINAL REVIEW ==========")
-print(comment)
+        if "content" in data:
+
+            parts = []
+
+            for item in data["content"]:
+
+                if item.get("type") == "text":
+                    parts.append(item.get("text", ""))
+
+            comment = "\n".join(parts)
+
+        with open("comment.txt", "w", encoding="utf-8") as f:
+            f.write(comment)
+
+        print("========== FINAL REVIEW ==========")
+        print(comment)
+
+        break
+
+    except Exception as ex:
+
+        if attempt == max_retries - 1:
+
+            with open("comment.txt", "w", encoding="utf-8") as f:
+                f.write(f"Claude Review Failed:\n\n{str(ex)}")
+
+            raise ex
+
+        print("Retrying after error...")
+        time.sleep(30)
