@@ -1,6 +1,7 @@
 import os
 import time
 import requests
+import sys
 
 # ==========================================
 # CONFIG
@@ -23,7 +24,7 @@ with open("pr.diff", "r", encoding="utf-8") as f:
     diff = f.read()
 
 # ==========================================
-# SKIP EMPTY REVIEWS
+# SKIP EMPTY REVIEW
 # ==========================================
 
 if not diff.strip():
@@ -32,7 +33,7 @@ if not diff.strip():
         f.write("No .cs or .sql changes detected for review.")
 
     print("No .cs or .sql changes detected.")
-    exit(0)
+    sys.exit(0)
 
 # ==========================================
 # REDUCE TOKEN USAGE
@@ -41,7 +42,7 @@ if not diff.strip():
 diff = diff[:MAX_DIFF_SIZE]
 
 # ==========================================
-# OPTIMIZED REVIEW PROMPT
+# REVIEW PROMPT
 # ==========================================
 
 prompt = f"""
@@ -145,7 +146,7 @@ for attempt in range(MAX_RETRIES):
                     f"Claude API Error: {response.status_code}\n\n{error_text}"
                 )
 
-            exit(1)
+            sys.exit(1)
 
         # ==========================================
         # PARSE RESPONSE
@@ -167,7 +168,7 @@ for attempt in range(MAX_RETRIES):
             comment = "\n".join(text_parts)
 
         # ==========================================
-        # SAVE REVIEW COMMENT
+        # SAVE REVIEW
         # ==========================================
 
         with open("comment.txt", "w", encoding="utf-8") as f:
