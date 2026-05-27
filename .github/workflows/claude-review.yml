@@ -18,7 +18,7 @@ jobs:
     steps:
 
       # ==========================================
-      # CHECKOUT CODE
+      # CHECKOUT REPOSITORY
       # ==========================================
 
       - name: Checkout repository
@@ -45,6 +45,7 @@ jobs:
 
       # ==========================================
       # GENERATE PR DIFF
+      # ONLY .CS + .SQL FILES
       # ==========================================
 
       - name: Generate PR Diff
@@ -52,23 +53,11 @@ jobs:
           git fetch origin ${{ github.event.pull_request.base.ref }}
 
           git diff origin/${{ github.event.pull_request.base.ref }}...HEAD \
-            -- '*.cs' '*.csproj' '*.json' '*.yml' '*.yaml' '*.sql' \
+            -- '*.cs' '*.sql' \
             > pr.diff
 
           echo "========== PR DIFF =========="
           cat pr.diff
-
-      # ==========================================
-      # CHECK AVAILABLE CLAUDE MODELS
-      # ==========================================
-
-      - name: Check Available Models
-        run: |
-          echo "========== AVAILABLE ANTHROPIC MODELS =========="
-
-          curl https://api.anthropic.com/v1/models \
-            -H "x-api-key: ${{ secrets.ANTHROPIC_API_KEY }}" \
-            -H "anthropic-version: 2023-06-01"
 
       # ==========================================
       # RUN CLAUDE REVIEW
@@ -90,7 +79,7 @@ jobs:
           cat comment.txt
 
       # ==========================================
-      # POST COMMENT TO PR
+      # POST REVIEW TO PR
       # ==========================================
 
       - name: Post PR Comment
