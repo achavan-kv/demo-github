@@ -3,66 +3,82 @@ import time
 import requests
 
 # ==========================================
-# API KEY
+# CONFIG
 # ==========================================
 
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 
+MODEL = "claude-sonnet-4-6"
+
+MAX_DIFF_SIZE = 50000
+
+MAX_RETRIES = 3
+
 # ==========================================
-# LOAD DIFF
+# LOAD PR DIFF
 # ==========================================
 
 with open("pr.diff", "r", encoding="utf-8") as f:
     diff = f.read()
 
-# Prevent token overflow
-diff = diff[:150000]
+# ==========================================
+# SKIP EMPTY REVIEWS
+# ==========================================
+
+if not diff.strip():
+
+    with open("comment.txt", "w", encoding="utf-8") as f:
+        f.write("No .cs or .sql changes detected for review.")
+
+    print("No .cs or .sql changes detected.")
+    exit(0)
 
 # ==========================================
-# PROMPT
+# REDUCE TOKEN USAGE
+# ==========================================
+
+diff = diff[:MAX_DIFF_SIZE]
+
+# ==========================================
+# OPTIMIZED REVIEW PROMPT
 # ==========================================
 
 prompt = f"""
-You are a highly strict Principal .NET Architect,
-SQL Server Performance Expert,
-Security Reviewer,
-and Enterprise Code Quality Auditor.
+Act as a strict enterprise code reviewer.
 
-Your responsibility is to perform an enterprise-grade pull request review.
+Review ONLY for important issues:
 
-Review this PR diff critically as if it is production banking software.
+- Runtime bugs
+- Null reference risks
+- SQL issues
+- Security vulnerabilities
+- Performance problems
+- Async/threading issues
+- Dead code
+- Bad exception handling
+- Production risks
+- Maintainability concerns
+- SOLID/design violations
 
-Focus on:
+Rules:
+- Be concise
+- Ignore cosmetic/style suggestions
+- Prioritize production-impacting issues
+- Mention exact problematic code when possible
+- Do not add decorative titles/headings
 
-1. .NET / C# standards
-2. SOLID principles
-3. Runtime bugs
-4. Security vulnerabilities
-5. SQL optimization
-6. Performance issues
-7. Async/threading issues
-8. Dead code
-9. Maintainability
-10. Enterprise production risks
+Output format:
 
-Be extremely strict.
+[Severity] Title
 
-Always provide:
-- Severity
-- Problem
-- Risk
-- Recommendation
+Problem:
+Risk:
+Recommendation:
 
-Severity values:
-- Critical
-- High
-- Medium
-- Low
+Severity:
+Critical | High | Medium | Low
 
-===========================================================
-PR DIFF
-===========================================================
-
+PR DIFF:
 {diff}
 """
 
@@ -71,9 +87,9 @@ PR DIFF
 # ==========================================
 
 body = {
-    "model": "claude-sonnet-4-6",
-    "max_tokens": 4000,
-    "temperature": 0.1,
+    "model": MODEL,
+    "max_tokens": 2000,
+    "temperature": 0,
     "messages": [
         {
             "role": "user",
@@ -83,12 +99,10 @@ body = {
 }
 
 # ==========================================
-# CALL API
+# CALL CLAUDE API
 # ==========================================
 
-max_retries = 3
-
-for attempt in range(max_retries):
+for attempt in range(MAX_RETRIES):
 
     try:
 
@@ -103,25 +117,38 @@ for attempt in range(max_retries):
             timeout=180
         )
 
-        print("========== CLAUDE API RESPONSE ==========")
-        print("Status Code:", response.status_code)
+        print("Status:", response.status_code)
+
+        # ==========================================
+        # RATE LIMIT HANDLING
+        # ==========================================
 
         if response.status_code == 429:
 
-            print("Rate limit exceeded. Waiting 60 seconds...")
+            print("Rate limited. Waiting 60 seconds...")
             time.sleep(60)
             continue
 
+        # ==========================================
+        # API ERROR HANDLING
+        # ==========================================
+
         if response.status_code != 200:
 
-            print(response.text)
+            error_text = response.text
+
+            print(error_text)
 
             with open("comment.txt", "w", encoding="utf-8") as f:
                 f.write(
-                    f"Claude API Error: {response.status_code}\n\n{response.text}"
+                    f"Claude API Error: {response.status_code}\n\n{error_text}"
                 )
 
             exit(1)
+
+        # ==========================================
+        # PARSE RESPONSE
+        # ==========================================
 
         data = response.json()
 
@@ -129,31 +156,34 @@ for attempt in range(max_retries):
 
         if "content" in data:
 
-            parts = []
+            text_parts = []
 
             for item in data["content"]:
 
                 if item.get("type") == "text":
-                    parts.append(item.get("text", ""))
+                    text_parts.append(item.get("text", ""))
 
-            comment = "\n".join(parts)
+            comment = "\n".join(text_parts)
+
+        # ==========================================
+        # SAVE REVIEW COMMENT
+        # ==========================================
 
         with open("comment.txt", "w", encoding="utf-8") as f:
             f.write(comment)
 
-        print("========== FINAL REVIEW ==========")
         print(comment)
 
         break
 
     except Exception as ex:
 
-        if attempt == max_retries - 1:
+        if attempt == MAX_RETRIES - 1:
 
             with open("comment.txt", "w", encoding="utf-8") as f:
-                f.write(f"Claude Review Failed:\n\n{str(ex)}")
+                f.write(f"Review Failed:\n\n{str(ex)}")
 
             raise ex
 
-        print("Retrying after error...")
+        print("Retrying...")
         time.sleep(30)
