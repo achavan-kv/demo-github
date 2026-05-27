@@ -97,3 +97,23 @@ jobs:
               issue_number: context.issue.number,
               body: `## Claude AI Review\n\n${comment}`
             });
+
+      # ==========================================
+      # FAIL PIPELINE FOR CRITICAL/HIGH
+      # ==========================================
+
+      - name: Validate Claude Review Result
+        run: |
+          echo "Checking for blocking issues..."
+
+          if grep -E "\[Critical\]|\[High\]" comment.txt; then
+            echo ""
+            echo "========================================="
+            echo "CLAUDE REVIEW FAILED"
+            echo "Critical/High severity issues detected."
+            echo "Pull Request cannot be approved."
+            echo "========================================="
+            exit 1
+          fi
+
+          echo "No blocking issues detected."
