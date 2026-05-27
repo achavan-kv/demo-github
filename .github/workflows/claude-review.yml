@@ -89,13 +89,47 @@ jobs:
           script: |
             const fs = require('fs');
 
-            const comment = fs.readFileSync('comment.txt', 'utf8');
+            let comment = fs.readFileSync('comment.txt', 'utf8');
+
+            // ==========================================
+            // FORMAT REVIEW OUTPUT
+            // ==========================================
+
+            comment = comment
+              .replaceAll(
+                'Problem:',
+                '🔴 <span style="color:red"><strong>Problem:</strong></span>'
+              )
+              .replaceAll(
+                'Risk:',
+                '🔴 <span style="color:red"><strong>Risk:</strong></span>'
+              )
+              .replaceAll(
+                'Recommendation:',
+                '🟢 <span style="color:green"><strong>Recommendation:</strong></span>'
+              )
+              .replaceAll(
+                '[Critical]',
+                '🚨 <strong><span style="color:red">[Critical]</span></strong>'
+              )
+              .replaceAll(
+                '[High]',
+                '🟠 <strong><span style="color:orange">[High]</span></strong>'
+              )
+              .replaceAll(
+                '[Medium]',
+                '🟡 <strong><span style="color:#b59b00">[Medium]</span></strong>'
+              )
+              .replaceAll(
+                '[Low]',
+                '🔵 <strong><span style="color:blue">[Low]</span></strong>'
+              );
 
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## Claude AI Review\n\n${comment}`
+              body: `# Claude AI Review\n\n${comment}`
             });
 
       # ==========================================
