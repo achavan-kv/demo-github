@@ -17,19 +17,35 @@ jobs:
 
     steps:
 
+      # ==========================================
+      # CHECKOUT CODE
+      # ==========================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # ==========================================
+      # SETUP PYTHON
+      # ==========================================
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ==========================================
+      # INSTALL DEPENDENCIES
+      # ==========================================
+
       - name: Install dependencies
         run: |
           pip install requests
+
+      # ==========================================
+      # GENERATE PR DIFF
+      # ==========================================
 
       - name: Generate PR Diff
         run: |
@@ -42,16 +58,40 @@ jobs:
           echo "========== PR DIFF =========="
           cat pr.diff
 
+      # ==========================================
+      # CHECK AVAILABLE CLAUDE MODELS
+      # ==========================================
+
+      - name: Check Available Models
+        run: |
+          echo "========== AVAILABLE ANTHROPIC MODELS =========="
+
+          curl https://api.anthropic.com/v1/models \
+            -H "x-api-key: ${{ secrets.ANTHROPIC_API_KEY }}" \
+            -H "anthropic-version: 2023-06-01"
+
+      # ==========================================
+      # RUN CLAUDE REVIEW
+      # ==========================================
+
       - name: Run Claude Review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           python .github/scripts/claude_review.py
 
+      # ==========================================
+      # PRINT REVIEW
+      # ==========================================
+
       - name: Print Claude Review
         run: |
           echo "========== CLAUDE REVIEW =========="
           cat comment.txt
+
+      # ==========================================
+      # POST COMMENT TO PR
+      # ==========================================
 
       - name: Post PR Comment
         uses: actions/github-script@v7
