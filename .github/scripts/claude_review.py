@@ -10,7 +10,8 @@ ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 
 MODEL = "claude-sonnet-4-6"
 
-MAX_DIFF_SIZE = 50000
+# Best enterprise balance
+MAX_DIFF_SIZE = 40000
 
 MAX_RETRIES = 3
 
@@ -88,7 +89,7 @@ PR DIFF:
 
 body = {
     "model": MODEL,
-    "max_tokens": 2000,
+    "max_tokens": 1200,
     "temperature": 0,
     "messages": [
         {
